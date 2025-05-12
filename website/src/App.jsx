@@ -35,7 +35,7 @@ export default function App() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex-shrink-0 flex items-center">
-              <span className="text-xl font-bold text-indigo-600">AI Agent</span>
+              <span className="text-xl font-bold text-indigo-600">Tensor Wrap</span>
             </div>
 
             {/* Desktop Menu */}
@@ -256,13 +256,13 @@ export default function App() {
                   name: 'Saurav Mittal',
                   role: 'CEO & Co-founder',
                   bio: 'Led core ML infrastructure for Apple Intelligence and Apple Special Project Group',
-                  image: 'https://placehold.co/200x200/indigo/white?text=Alex ',
+                  image: 'https://placehold.co/200x200/indigo/white?text=Saurav ',
                 },
                 {
                   name: 'Shivin Devgon',
                   role: 'CTO & Co-founder',
                   bio: 'Led model optimization at Alphabet for Waymo\'s Vision Transformers.',
-                  image: 'https://placehold.co/200x200/indigo/white?text=Jamie ',
+                  image: 'https://placehold.co/200x200/indigo/white?text=Shivin ',
                 },
               ].map((member, index) => (
                 <div
@@ -349,10 +349,10 @@ export default function App() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex flex-col md:flex-row justify-between items-center">
             <div className="mb-4 md:mb-0">
-              <span className="text-lg font-bold text-indigo-600">AI Agent</span>
+              <span className="text-lg font-bold text-indigo-600">Tensor Wrap</span>
             </div>
             <div className="text-sm text-gray-600">
-              &copy; {new Date().getFullYear()} AI Agent Inc. All rights reserved.
+              &copy; {new Date().getFullYear()} Tensor Wrap Inc. All rights reserved.
             </div>
           </div>
         </div>
