@@ -246,22 +246,22 @@ export default function App() {
             <div className="text-center mb-16">
               <h2 className="text-3xl font-bold text-gray-900">Founding Team</h2>
               <p className="mt-4 max-w-2xl mx-auto text-lg text-gray-600">
-                Decades of combined experience at Alphabet, Apple, and startups building scalable AI systems.
+                Experience at Alphabet, Apple, and startups building scalable AI systems.
               </p>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
               {[
                 {
-                  name: 'Alex Chen',
+                  name: 'Saurav Mittal',
                   role: 'CEO & Co-founder',
-                  bio: 'Former Google Brain researcher. Built large-scale recommendation systems used by millions.',
+                  bio: 'Led core ML infrastructure for Apple Intelligence and Apple Special Project Group',
                   image: 'https://placehold.co/200x200/indigo/white?text=Alex ',
                 },
                 {
-                  name: 'Jamie Park',
+                  name: 'Shivin Devgon',
                   role: 'CTO & Co-founder',
-                  bio: 'Ex-Apple ML Systems lead. Designed custom inference pipelines for Siri and Core ML.',
+                  bio: 'Led model optimization at Alphabet for Waymo\'s Vision Transformers.',
                   image: 'https://placehold.co/200x200/indigo/white?text=Jamie ',
                 },
               ].map((member, index) => (
