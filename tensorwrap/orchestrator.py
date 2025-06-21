@@ -14,7 +14,7 @@ from .problems.matmul import example_kernels
 from .optimizer import SelfHealingCodeGenerator
 
 
-use_one_shot_kernels = True
+use_one_shot_kernels = False
 
 class Orchestrator:
     """Main orchestrator for the kernel optimization search process."""
@@ -132,7 +132,13 @@ class Orchestrator:
                 # Generate ideas
                 ideas = self.idea_generator.generate_ideas(parent.code, self.beam_width)
                 
+                print("-" * 120)
                 for idea in ideas:
+                    print("-" * 120)
+
+                    idea_title = idea.split("\n")[0]
+                    rprint(f"[bold blue]{idea_title}[/bold blue]")
+
                     # Generate code from idea - may return code string or dict with metadata
                     code_result = self.code_generator.generate_code(parent.code, idea, self.problem_spec)
                     
@@ -156,12 +162,10 @@ class Orchestrator:
                     
                     try:
                         if latency_ms_from_healing is not None:
-                            rprint(f"Using pre-validated candidate from self-healing for idea: {idea[:60]}...")
+                            rprint(f"Using pre-validated candidate from self-healing")
                             is_correct = True  # We know it's correct from self-healing
                             latency_ms = latency_ms_from_healing
                         else:
-                            # Standard evaluation
-                            rprint(f"Evaluating candidate based on idea: {idea[:60]}...")
                             is_correct, latency_ms = self.evaluator.evaluate(candidate)
                         
                         candidate.correct = is_correct
@@ -176,7 +180,7 @@ class Orchestrator:
                     
                     # Format latency display safely, handling None values
                     latency_display = f"{candidate.latency_ms:.2f}ms" if candidate.latency_ms is not None else "N/A"
-                    rprint(f"Idea: {idea[:60]} Results: correct={candidate.correct}, latency={latency_display}")
+                    rprint(f"Results: correct={candidate.correct}, latency={latency_display}")
                     
                     round_candidates.append(candidate)
                     
@@ -184,6 +188,9 @@ class Orchestrator:
                     if candidate.correct and (best_candidate is None or candidate.latency_ms < best_candidate.latency_ms):
                         best_candidate = candidate
                     
+                    print("-" * 120)
+            print("-" * 120)
+            
             # Update previous candidates for next round
             prev_candidates = round_candidates
         
@@ -217,7 +224,7 @@ def main():
     parser = argparse.ArgumentParser(description="TensorWrap kernel optimization search")
     parser.add_argument("--problem", type=str, default="tensorwrap/problems/matmul", help="Path to problem directory")
     parser.add_argument("--rounds", type=int, default=3, help="Number of optimization rounds")
-    parser.add_argument("--beam", type=int, default=3, help="Beam size (top-k candidates per round)")
+    parser.add_argument("--beam", type=int, default=2, help="Beam size (top-k candidates per round)")
     parser.add_argument("--dry-run", action="store_true", help="Dry run mode (no actual compilation)")
     parser.add_argument("--mode", default="generate", help="Mode: generate or evaluate")
     parser.add_argument("--db", default="kernels.db", help="Path to kernels database")

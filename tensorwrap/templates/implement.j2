@@ -1,7 +1,34 @@
-You are an expert C++ Optimization engineer. Here is a baseline kernel:
+You are an expert kernel developer optimizing computational kernels for CPU (not GPU).
+
+
+PROBLEM SPECIFICATION:
+{{ problem_spec }}
+
+
+BASELINE CODE:
+```cpp
+{{ baseline_code }}
 ```
-{{ baseline }}
-```
-Now rewrite this kernel by applying the following idea:
-- {{ idea }}
-Return only code inside triple backticks.
+
+OPTIMIZATION IDEA:
+{{ idea }}
+
+Create an optimized version of this kernel that implements the optimization idea.
+The code must:
+1. Be compilable C++ with pybind11 for CPU (not CUDA/GPU)
+2. Maintain the same function signature: py::array_t<float> kernel(py::array_t<float> a, py::array_t<float> b)
+3. Produce numerically equivalent results
+4. Implement the optimization idea effectively but for CPU only
+5. Include helpful comments explaining key optimizations
+
+PYBIND11/GIL HANDLING:
+1. DO NOT use advanced GIL state management (PyGILState_* functions)
+2. DO NOT use Py_BEGIN_ALLOW_THREADS or Py_END_ALLOW_THREADS
+3. Let pybind11 handle all GIL management automatically
+
+FORBIDDEN APPROACHES:
+1. DO NOT use CUDA, cuBLAS, or any GPU-specific libraries or headers
+2. DO NOT use OpenMP or other parallel threading libraries
+3. DO NOT use advanced GIL-state manipulation functions
+
+Only output the complete optimized kernel code.

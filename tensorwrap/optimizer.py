@@ -43,8 +43,10 @@ class SelfHealingCodeGenerator(CodeGenerator):
         """
         super().__init__(False, problem_path, max_iterations)
         self.evaluator = evaluator
+        self.debug_template = self.template_env.get_template("debug_kernel.j2")
         
-    def optimize_kernel(self, idea, baseline_code, problem_spec):
+
+    def generate_code(self, idea, baseline_code, problem_spec):
         """Generate a viable kernel candidate through LLM-based iterative debugging.
         
         Args:
@@ -55,27 +57,26 @@ class SelfHealingCodeGenerator(CodeGenerator):
         Returns:
             Dictionary with optimized code and metadata, or None if optimization failed
         """
-        print(f"\nStarting self-healing optimization for idea: {idea[:50]}...")
         
-        context = {
-            "idea": idea,
-            "baseline_code": baseline_code,
-            "problem_spec": problem_spec,
-            "attempt_history": [],
-            "current_iteration": 0
-        }
+        attempt_history = []
+        current_iteration = 0
         
-        while context["current_iteration"] < self.max_iterations:
-            # Increment iteration counter
-            context["current_iteration"] += 1
-            print(f"Iteration {context['current_iteration']}/{self.max_iterations}")
+        while current_iteration < self.max_iterations:
+            current_iteration += 1
+            print(f"Iteration {current_iteration}/{self.max_iterations}")
             
-            # Generate candidate kernel or fix previous attempt
-            if context["current_iteration"] == 1:
-                candidate = self._generate_initial_candidate(context)
+            if current_iteration == 1:
+                prompt = self.implement_template.render(baseline_code=baseline_code, idea=idea, problem_spec=problem_spec)
             else:
-                candidate = self._fix_candidate(context)
+                prompt = self.debug_template.render(baseline_code=baseline_code, idea=idea, problem_spec=problem_spec, last_attempt=attempt_history[-1])
                 
+            if self.provider == "OpenAI":
+                candidate = self._generate_with_openai(prompt)
+            elif self.provider == "Google":
+                candidate = self._generate_with_google(prompt)
+            else:
+                raise ValueError(f"Unknown provider: {self.provider}")
+            
             if not candidate:
                 print("Failed to generate candidate code")
                 break
@@ -83,20 +84,19 @@ class SelfHealingCodeGenerator(CodeGenerator):
             # Try to compile and validate
             compile_result, validation_result = self._test_candidate(candidate)
             
-            # Record this attempt in history
-            context["attempt_history"].append({
+            attempt_history.append({
                 "candidate": candidate,
                 "compile_result": compile_result,
                 "validation_result": validation_result
             })
             
-            # Check if we've succeeded
+            print()
             if compile_result.success and validation_result.success:
-                print(f"Successfully optimized kernel in {context['current_iteration']} iterations!")
+                print(f"Successfully compiled kernel in {current_iteration} iterations!")
                 return {
                     "code": candidate,
                     "idea": idea,
-                    "iterations": context["current_iteration"],
+                    "iterations": current_iteration,
                     "latency_ms": validation_result.latency_ms
                 }
             else:
@@ -105,129 +105,10 @@ class SelfHealingCodeGenerator(CodeGenerator):
                 elif not validation_result.success:
                     print(f"Validation failed: {validation_result.error}")
         
-        # Failed to generate a viable candidate after max iterations
-        print(f"Failed to optimize kernel after {self.max_iterations} iterations")
-        return None
-    
-    def _generate_initial_candidate(self, context):
-        """Generate initial kernel candidate based on optimization idea."""
-        print("Generating initial optimized kernel...")
-        
-        prompt = f"""
-        You are an expert kernel developer optimizing computational kernels for CPU (not GPU).
-        
-        BASELINE CODE:
-        ```cpp
-        {context["baseline_code"]}
-        ```
-        
-        PROBLEM SPECIFICATION:
-        {str(context["problem_spec"].__dict__)}
-        
-        OPTIMIZATION IDEA:
-        {context["idea"]}
-        
-        Create an optimized version of this kernel that implements the optimization idea.
-        The code must:
-        1. Be compilable C++ with pybind11 for CPU (not CUDA/GPU)
-        2. Maintain the same function signature: py::array_t<float> kernel(py::array_t<float> a, py::array_t<float> b)
-        3. Produce numerically equivalent results
-        4. Implement the optimization idea effectively but for CPU only
-        5. Include helpful comments explaining key optimizations
-        
-        PYBIND11/GIL HANDLING:
-        1. DO NOT use advanced GIL state management (PyGILState_* functions)
-        2. DO NOT use Py_BEGIN_ALLOW_THREADS or Py_END_ALLOW_THREADS
-        3. Let pybind11 handle all GIL management automatically
-        
-        FORBIDDEN APPROACHES:
-        1. DO NOT use CUDA, cuBLAS, or any GPU-specific libraries or headers
-        2. DO NOT use OpenMP or other parallel threading libraries
-        3. DO NOT use advanced GIL-state manipulation functions
-        
-        Only output the complete optimized kernel code.
-        """
-        
-        try:
-            response = self.client.chat.completions.create(
-                model="o3-2025-04-16",
-                messages=[{"role": "user", "content": prompt}]
-            )
-            response_text = response.choices[0].message.content
-            return self._extract_code(response_text)
-        except Exception as e:
-            print(f"Error generating initial candidate: {e}")
-            return None
-    
-    def _fix_candidate(self, context):
-        """Fix issues with the previous candidate."""
-        print("Fixing previous candidate...")
-        
-        last_attempt = context["attempt_history"][-1]
-        
-        prompt = f"""
-        You are an expert kernel developer debugging optimized computational kernels for CPU (not GPU).
-        
-        OPTIMIZATION IDEA:
-        {context["idea"]}
-        
-        BASELINE CODE:
-        ```cpp
-        {context["baseline_code"]}
-        ```
-        
-        PROBLEM SPECIFICATION:
-        {str(context["problem_spec"].__dict__)}
-        
-        PREVIOUS ATTEMPT:
-        ```cpp
-        {last_attempt["candidate"]}
-        ```
-        
-        ISSUES ENCOUNTERED:
-        Compilation success: {last_attempt["compile_result"].success}
-        {last_attempt["compile_result"].error if not last_attempt["compile_result"].success else ""}
-        
-        Validation success: {last_attempt["validation_result"].success}
-        {last_attempt["validation_result"].error if not last_attempt["validation_result"].success else ""}
-        
-        TASK:
-        Fix the issues in the previous attempt while preserving the optimization idea.
-        
-        IMPORTANT CONSTRAINTS:
-        1. This must be pure C++ code for CPU (not CUDA/GPU)
-        2. Do NOT use CUDA, cuBLAS, or any GPU-specific libraries or headers
-        3. Fix any compilation errors and ensure correct numerical output
-        4. The kernel function signature must be: py::array_t<float> kernel(py::array_t<float> a, py::array_t<float> b)
-        5. Ensure the PYBIND11_MODULE and m.def("kernel", &kernel) declaration is included
-        
-        PYBIND11/GIL HANDLING - CRITICAL:
-        1. DO NOT use advanced GIL state management (PyGILState_* functions)
-        2. DO NOT use Py_BEGIN_ALLOW_THREADS or Py_END_ALLOW_THREADS
-        3. Let pybind11 handle all GIL management automatically
-        4. DO NOT use OpenMP or other parallel threading libraries
-        5. These errors commonly cause segmentation faults and crashes
-        
-        CHAIN OF THOUGHT:
-        1. Identify the root cause of the error
-        2. Determine necessary changes while preserving optimizations
-        3. Implement fixes systematically
-        4. Verify changes address the specific issues
-        
-        Only output the complete fixed kernel code.
-        """
-        
-        try:
-            response = self.client.chat.completions.create(
-                model="o3-2025-04-16",
-                messages=[{"role": "user", "content": prompt}]
-            )
-            response_text = response.choices[0].message.content
-            return self._extract_code(response_text)
-        except Exception as e:
-            print(f"Error fixing candidate: {e}")
-            return None
-    
+        print(f"Failed to compile kernel after {self.max_iterations} iterations")
+        return candidate
+
+
     def _test_candidate(self, candidate_code):
         """Test if the candidate compiles and produces correct results."""
         # 1. Try compiling the code
@@ -244,6 +125,7 @@ class SelfHealingCodeGenerator(CodeGenerator):
             
         return compile_result, validation_result
     
+
     def _compile_candidate(self, candidate_code):
         """Compile the candidate code and return result."""
         try:
@@ -257,12 +139,13 @@ class SelfHealingCodeGenerator(CodeGenerator):
             print(f"Exception during compilation: {e}")
             return CompileResult(success=False, error=str(e))
     
+
     def _validate_candidate(self, candidate_code):
         """Validate candidate correctness and performance."""
         try:
             # Create a temporary candidate to validate using our stored problem_name
             candidate = KernelCandidate(
-                problem=self.evaluator.problem_name,
+                problem=self.evaluator.problem_spec.name,
                 round=0,
                 code=candidate_code,
                 idea="Optimization candidate"

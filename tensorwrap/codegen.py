@@ -39,7 +39,7 @@ class CodeGenerator(LLMClient):
         Returns:
             Generated optimized code or a dict with code and metadata if self-healing is used
         """
-        prompt = self.implement_template.render(baseline=baseline_code, idea=idea)
+        prompt = self.implement_template.render(baseline_code=baseline_code, idea=idea, problem_spec=problem_spec)
         
         if self.mock_mode:
             return self._generate_mock_code(baseline_code, idea)

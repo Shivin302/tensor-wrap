@@ -269,7 +269,7 @@ class LocalCPUEvaluator:
             # Compile the code using g++ with pybind11
             try:
                 cmd = [
-                    "g++", "-O3", "-Wall", "-shared", "-std=c++14", "-fPIC",
+                    "g++", "-O3", "-Wall", "-shared", "-std=c++14", "-fPIC", "-mavx2",
                     f"-I{self.pybind11_include}",
                     f"-I{self.python_include}",
                     f"-I{self.python_include_config}",
@@ -288,11 +288,11 @@ class LocalCPUEvaluator:
                 )
                 
                 if result.returncode != 0:
-                    print("*" * 50)
+                    print("*" * 80)
                     print(f"Compilation failed with return code: {result.returncode}")
                     print(f"Stdout: {result.stdout.decode()[:2000]}")
                     print(f"Stderr: {result.stderr.decode()[:2000]}")
-                    print("*" * 50)
+                    print("*" * 80)
                     return None
                 
                 # Make sure the file exists and is accessible

@@ -1,0 +1,52 @@
+You are an expert kernel developer debugging optimized computational kernels for CPU (not GPU).
+
+
+PROBLEM SPECIFICATION:
+{{ problem_spec }}
+
+
+BASELINE CODE:
+```cpp
+{{ baseline_code }}
+```
+
+OPTIMIZATION IDEA:
+{{ idea }}
+
+
+PREVIOUS ATTEMPT:
+```cpp
+{{ last_attempt["candidate"] }}
+```
+
+ISSUES ENCOUNTERED:
+Compilation success: { last_attempt["compile_result"].success }
+{ last_attempt["compile_result"].error if not last_attempt["compile_result"].success else "" }
+
+Validation success: { last_attempt["validation_result"].success }
+{ last_attempt["validation_result"].error if not last_attempt["validation_result"].success else "" }
+
+TASK:
+Fix the issues in the previous attempt while preserving the optimization idea.
+
+IMPORTANT CONSTRAINTS:
+1. This must be pure C++ code for CPU (not CUDA/GPU)
+2. Do NOT use CUDA, cuBLAS, or any GPU-specific libraries or headers
+3. Fix any compilation errors and ensure correct numerical output
+4. The kernel function signature must be: py::array_t<float> kernel(py::array_t<float> a, py::array_t<float> b)
+5. Ensure the PYBIND11_MODULE and m.def("kernel", &kernel) declaration is included
+
+PYBIND11/GIL HANDLING - CRITICAL:
+1. DO NOT use advanced GIL state management (PyGILState_* functions)
+2. DO NOT use Py_BEGIN_ALLOW_THREADS or Py_END_ALLOW_THREADS
+3. Let pybind11 handle all GIL management automatically
+4. DO NOT use OpenMP or other parallel threading libraries
+5. These errors commonly cause segmentation faults and crashes
+
+CHAIN OF THOUGHT:
+1. Identify the root cause of the error
+2. Determine necessary changes while preserving optimizations
+3. Implement fixes systematically
+4. Verify changes address the specific issues
+
+Only output the complete fixed kernel code.
