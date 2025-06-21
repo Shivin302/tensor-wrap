@@ -1,4 +1,5 @@
-api_key.csv
+api_keys.csv
+*.db.wal
 
 
 

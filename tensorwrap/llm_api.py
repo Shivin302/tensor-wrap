@@ -27,8 +27,8 @@ class LLMClient:
             elif "Google" in self.api_keys and not pd.isna(self.api_keys["Google"]):
                 self.provider = "Google"
                 genai.configure(api_key=self.api_keys["Google"])
-                self.model = "gemini-2.0-flash"
-                # self.model = "gemini-2.5-flash-preview-05-20"
+                # self.model = "gemini-2.0-flash"
+                self.model = "gemini-2.5-flash-preview-05-20"
                 self.client = genai.GenerativeModel(self.model)
             elif "Deepseek-V3-Free" in self.api_keys and not pd.isna(self.api_keys["Deepseek-V3-Free"]):
                 self.provider = "OpenAI"
