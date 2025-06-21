@@ -10,6 +10,11 @@ from .codegen import CodeGenerator
 from .evaluator.local_cpu import LocalCPUEvaluator
 from .scorer import Scorer
 from .storage import Storage
+from .problems.matmul import example_kernels
+from .optimizer import SelfHealingCodeGenerator
+
+
+use_one_shot_kernels = True
 
 class Orchestrator:
     """Main orchestrator for the kernel optimization search process."""
@@ -50,14 +55,21 @@ class Orchestrator:
         else:
             abs_problem_path = problem_path
             
-        self.code_generator = CodeGenerator(
-            mock_mode=dry_run,
-            problem_path=abs_problem_path,
-            self_healing=not dry_run,  # Only use self-healing when not in dry-run mode
-            max_iterations=3
-        )
         # Use mock mode for evaluation only when in dry-run mode
         self.evaluator = LocalCPUEvaluator(problem_path, mock_mode=dry_run)
+
+        if dry_run or use_one_shot_kernels:
+            self.code_generator = CodeGenerator(
+                mock_mode=dry_run,
+                problem_path=abs_problem_path,
+                max_iterations=3
+            )
+        else:
+            self.code_generator = SelfHealingCodeGenerator(
+                problem_path=abs_problem_path,
+                evaluator=self.evaluator,
+                max_iterations=3
+            )
         
         # Load the problem specification
         self.problem_spec = self.evaluator.problem_spec
@@ -110,14 +122,15 @@ class Orchestrator:
                 break
             
             # Get the best candidates from the previous round
-            top_candidates = self.scorer.rank_candidates(prev_candidates, self.beam_width)
+            # top_candidates = self.scorer.rank_candidates(prev_candidates, self.beam_width)
+            top_candidates = self.scorer.rank_candidates(prev_candidates, 1)
             
             # Generate and evaluate new candidates
             round_candidates = []
             
             for parent in top_candidates:
                 # Generate ideas
-                ideas = self.idea_generator.generate_ideas(parent.code)
+                ideas = self.idea_generator.generate_ideas(parent.code, self.beam_width)
                 
                 for idea in ideas:
                     # Generate code from idea - may return code string or dict with metadata
@@ -163,7 +176,7 @@ class Orchestrator:
                     
                     # Format latency display safely, handling None values
                     latency_display = f"{candidate.latency_ms:.2f}ms" if candidate.latency_ms is not None else "N/A"
-                    rprint(f"  correct={candidate.correct}, latency={latency_display}")
+                    rprint(f"Idea: {idea[:60]} Results: correct={candidate.correct}, latency={latency_display}")
                     
                     round_candidates.append(candidate)
                     
@@ -171,11 +184,6 @@ class Orchestrator:
                     if candidate.correct and (best_candidate is None or candidate.latency_ms < best_candidate.latency_ms):
                         best_candidate = candidate
                     
-                    # Check for dry run
-                    if self.dry_run:
-                        rprint("\n[bold yellow]Dry run completed, exiting early.[/bold yellow]")
-                        return best_candidate
-            
             # Update previous candidates for next round
             prev_candidates = round_candidates
         
@@ -200,65 +208,16 @@ class Orchestrator:
         
         # For matmul problem, use a simple C++ implementation
         if problem_name == "matmul":
-            return """
-            #include <cstddef>
-            #include <cmath>
-            #include <pybind11/numpy.h>
-            namespace py = pybind11;
-            
-            // Define a simple matrix multiplication function that attempts to mimic NumPy's behavior
-            py::array_t<float> kernel(py::array_t<float> a, py::array_t<float> b) {
-                auto buf_a = a.request();
-                auto buf_b = b.request();
-                
-                if (buf_a.ndim != 2 || buf_b.ndim != 2) {
-                    throw std::runtime_error("Number of dimensions must be 2");
-                }
-                
-                if (buf_a.shape[1] != buf_b.shape[0]) {
-                    throw std::runtime_error("Incompatible shapes");
-                }
-                
-                size_t M = buf_a.shape[0];
-                size_t K = buf_a.shape[1];
-                size_t N = buf_b.shape[1];
-                
-                // Create the result array with the correct shape
-                py::array_t<float> result = py::array_t<float>({M, N});
-                auto buf_result = result.request();
-                
-                float* ptr_a = static_cast<float*>(buf_a.ptr);
-                float* ptr_b = static_cast<float*>(buf_b.ptr);
-                float* ptr_result = static_cast<float*>(buf_result.ptr);
-                
-                // Initialize the result array to zeros
-                for (size_t i = 0; i < M * N; ++i) {
-                    ptr_result[i] = 0.0f;
-                }
-                
-                // Use cache-friendly iteration order and accumulate in blocks
-                for (size_t i = 0; i < M; ++i) {
-                    for (size_t j = 0; j < N; ++j) {
-                        float sum = 0.0f;
-                        for (size_t k = 0; k < K; ++k) {
-                            sum += ptr_a[i * K + k] * ptr_b[k * N + j];
-                        }
-                        ptr_result[i * N + j] = sum;
-                    }
-                }
-                
-                return result;
-            }
-            """
+            return example_kernels.slow
         else:
             raise ValueError(f"Unknown problem: {self.problem_spec.name}")
 
 def main():
     """Main entry point for the command line interface."""
     parser = argparse.ArgumentParser(description="TensorWrap kernel optimization search")
-    parser.add_argument("--problem", help="Path to problem directory")
+    parser.add_argument("--problem", type=str, default="tensorwrap/problems/matmul", help="Path to problem directory")
     parser.add_argument("--rounds", type=int, default=3, help="Number of optimization rounds")
-    parser.add_argument("--beam", type=int, default=2, help="Beam size (top-k candidates per round)")
+    parser.add_argument("--beam", type=int, default=3, help="Beam size (top-k candidates per round)")
     parser.add_argument("--dry-run", action="store_true", help="Dry run mode (no actual compilation)")
     parser.add_argument("--mode", default="generate", help="Mode: generate or evaluate")
     parser.add_argument("--db", default="kernels.db", help="Path to kernels database")
@@ -266,9 +225,6 @@ def main():
     
     # Determine problem path
     problem_path = args.problem
-    if not problem_path:
-        print("Error: Please specify a problem path with --problem")
-        sys.exit(1)
     
     # Create and run orchestrator
     orchestrator = Orchestrator(

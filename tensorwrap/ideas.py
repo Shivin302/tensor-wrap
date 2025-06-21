@@ -2,20 +2,13 @@ import os
 import jinja2
 from typing import List
 
-# Try to import different LLM providers, with fallbacks
-try:
-    from openai import OpenAI
-    OPENAI_AVAILABLE = True
-except ImportError:
-    OPENAI_AVAILABLE = False
+from openai import OpenAI
+import google.generativeai as genai
+import pandas as pd
+from .llm_api import LLMClient
 
-try:
-    import google.generativeai as genai
-    GOOGLE_AVAILABLE = True
-except ImportError:
-    GOOGLE_AVAILABLE = False
 
-class IdeaGenerator:
+class IdeaGenerator(LLMClient):
     """Generates optimization ideas for kernels using LLMs."""
     
     def __init__(self, mock_mode=False):
@@ -24,23 +17,12 @@ class IdeaGenerator:
         Args:
             mock_mode: If True, use mock responses for dry runs instead of actual LLM calls
         """
+        super().__init__(mock_mode)
+
         self.template_loader = jinja2.FileSystemLoader("tensorwrap/templates")
         self.template_env = jinja2.Environment(loader=self.template_loader)
         self.brainstorm_template = self.template_env.get_template("brainstorm.j2")
-        self.mock_mode = mock_mode
-        
-        # Setup LLM providers if available and not in mock mode
-        if not mock_mode:
-            if OPENAI_AVAILABLE and os.environ.get("OPENAI_API_KEY"):
-                self.provider = "openai"
-                self.openai_client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
-            elif GOOGLE_AVAILABLE and os.environ.get("GOOGLE_API_KEY"):
-                self.provider = "google"
-                genai.configure(api_key=os.environ.get("GOOGLE_API_KEY"))
-            else:
-                raise RuntimeError("No LLM provider available. Set OPENAI_API_KEY or GOOGLE_API_KEY.")
-        else:
-            self.provider = "mock"
+
     
     def generate_ideas(self, baseline_code: str, num_ideas: int = 4) -> List[str]:
         """Generate optimization ideas for a baseline kernel code.
@@ -56,9 +38,9 @@ class IdeaGenerator:
         
         if self.mock_mode:
             return self._generate_mock_ideas(num_ideas)
-        elif self.provider == "openai":
+        elif self.provider == "OpenAI":
             return self._generate_with_openai(prompt, num_ideas)
-        else:  # google
+        elif self.provider == "Google":
             return self._generate_with_google(prompt, num_ideas)
     
     def _generate_with_openai(self, prompt: str, num_ideas: int) -> List[str]:
@@ -71,17 +53,14 @@ class IdeaGenerator:
         Returns:
             List of generated ideas
         """
-        # Using the latest o3 model
-        response = self.openai_client.chat.completions.create(
-            model="o3-2025-04-16",  # latest o3 model
+        response = self.client.chat.completions.create(
+            model=self.model,
             messages=[
                 {"role": "system", "content": "You are an expert CUDA kernel optimizer."},
                 {"role": "user", "content": prompt}
             ]
-            # o3-2025-04-16 only supports the default temperature (1.0)
         )
         
-        # Parse response and extract ideas
         text = response.choices[0].message.content
         ideas = self._parse_ideas(text, num_ideas)
         return ideas
@@ -96,14 +75,15 @@ class IdeaGenerator:
         Returns:
             List of generated ideas
         """
-        # TODO: Implement actual Google Generative AI API call
-        model = genai.GenerativeModel('gemini-pro')
-        response = model.generate_content(prompt)
+        response = self.client.generate_content(prompt)
         
-        # Parse response and extract ideas
         text = response.text
+        # print("." * 80)
+        # print(text)
+        # print("." * 80)
         ideas = self._parse_ideas(text, num_ideas)
         return ideas
+    
     
     def _generate_mock_ideas(self, num_ideas: int) -> List[str]:
         """Generate mock ideas for testing without LLM API calls.
@@ -124,6 +104,7 @@ class IdeaGenerator:
         ]
         return mock_ideas[:num_ideas]
         
+
     def _parse_ideas(self, text: str, num_ideas: int) -> List[str]:
         """Parse ideas from LLM response.
         
@@ -134,16 +115,17 @@ class IdeaGenerator:
         Returns:
             List of parsed ideas
         """
-        # This is a simple parsing logic; may need to be more robust in practice
         lines = text.split('\n')
         ideas = []
         
+        cur_idea = ""
         for line in lines:
             line = line.strip()
-            # Look for numbered lists like "1." or "1)"
-            if (line.startswith("- ") or 
-                any(line.startswith(f"{i}. ") or line.startswith(f"{i}) ") for i in range(1, num_ideas + 1))):
-                ideas.append(line.split(" ", 1)[1] if " " in line else line)
+            if "StartIdea" in line:
+                cur_idea = ""
+            elif "EndIdea" in line:
+                ideas.append(cur_idea.strip())
+            else:
+                cur_idea += line + "\n"
         
-        # Ensure we have the correct number of ideas
         return ideas[:num_ideas]

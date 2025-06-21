@@ -11,6 +11,7 @@ import re
 import time
 
 from .evaluator.local_cpu import LocalCPUEvaluator
+from .codegen import CodeGenerator
 
 
 @dataclass
@@ -30,34 +31,18 @@ class ValidationResult:
     correctness: Optional[bool] = None
 
 
-class LLMSelfHealingOptimizer:
+class SelfHealingCodeGenerator(CodeGenerator):
     """Uses LLM to iteratively debug and fix kernels until a viable candidate is found."""
     
-    def __init__(self, llm_client, problem_path, max_iterations=3):
+    def __init__(self, problem_path, evaluator, max_iterations=3):
         """Initialize the optimizer.
         
         Args:
-            llm_client: OpenAI client for LLM API calls
             problem_path: Path to problem specification directory
             max_iterations: Maximum number of optimization iterations
         """
-        self.llm_client = llm_client
-        self.problem_path = problem_path
-        self.max_iterations = max_iterations
-        self.evaluator = LocalCPUEvaluator(problem_path, mock_mode=False)
-        self.problem_name = self._get_problem_name_from_path(problem_path)
-        print(f"Using self-healing optimizer for problem: {self.problem_name}")
-    
-    def _get_problem_name_from_path(self, path):
-        """Extract problem name from path.
-        
-        Args:
-            path: Path to problem directory
-            
-        Returns:
-            Problem name (last component of path)
-        """
-        return os.path.basename(os.path.normpath(path))
+        super().__init__(False, problem_path, max_iterations)
+        self.evaluator = evaluator
         
     def optimize_kernel(self, idea, baseline_code, problem_spec):
         """Generate a viable kernel candidate through LLM-based iterative debugging.
@@ -164,7 +149,7 @@ class LLMSelfHealingOptimizer:
         """
         
         try:
-            response = self.llm_client.chat.completions.create(
+            response = self.client.chat.completions.create(
                 model="o3-2025-04-16",
                 messages=[{"role": "user", "content": prompt}]
             )
@@ -233,7 +218,7 @@ class LLMSelfHealingOptimizer:
         """
         
         try:
-            response = self.llm_client.chat.completions.create(
+            response = self.client.chat.completions.create(
                 model="o3-2025-04-16",
                 messages=[{"role": "user", "content": prompt}]
             )
@@ -277,13 +262,11 @@ class LLMSelfHealingOptimizer:
         try:
             # Create a temporary candidate to validate using our stored problem_name
             candidate = KernelCandidate(
-                problem=self.problem_name,
+                problem=self.evaluator.problem_name,
                 round=0,
                 code=candidate_code,
                 idea="Optimization candidate"
             )
-            
-            print(f"Validating candidate with problem: {self.problem_name}")
             
             # Check if code contains GIL management issues
             gil_keywords = ["PyGILState_", "Py_BEGIN_ALLOW_THREADS", "Py_END_ALLOW_THREADS"]

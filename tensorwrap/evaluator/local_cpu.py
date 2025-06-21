@@ -9,6 +9,8 @@ from typing import Dict, Tuple, Optional, Any
 import pybind11
 from ..schemas import ProblemSpec, KernelCandidate
 
+
+
 class TimeoutError(Exception):
     """Exception raised when kernel execution times out."""
     pass
@@ -59,8 +61,7 @@ class LocalCPUEvaluator:
         import yaml
         try:
             spec_yaml_path = os.path.join(self.problem_path, "spec.yaml")
-            print(f"Looking for spec.yaml at: {spec_yaml_path}")
-            print(f"Path exists: {os.path.exists(spec_yaml_path)}")
+            print(f"Path {spec_yaml_path} exists: {os.path.exists(spec_yaml_path)}")
             
             with open(spec_yaml_path, "r") as f:
                 spec_data = yaml.safe_load(f)
@@ -115,33 +116,31 @@ class LocalCPUEvaluator:
         # Real evaluation mode
         try:
             print("Starting real evaluation mode...")
-            # Generate reference output
+
+            print()
+            print("Generating inputs...")
+            inputs = self._generate_inputs(self.problem_spec)
+
+            print()
             print("Generating reference output...")
-            ref_output = self._generate_reference_output(self.problem_spec)
-            print(f"Reference output shape: {ref_output.shape}")
+            ref_output = self._generate_reference_output(self.problem_spec, inputs)
             
-            # Compile the candidate kernel
-            print("Compiling candidate kernel...")
+            print()
             module_path = self._compile(candidate.code)
             if not module_path:
                 print("Compilation failed, returning False")
                 return False, None
                 
-            # Import the compiled module
+            print()
             print(f"Importing compiled module from {module_path}...")
             import importlib.util
             spec = importlib.util.spec_from_file_location("candidate", module_path)
             module = importlib.util.module_from_spec(spec)
             spec.loader.exec_module(module)
-            print("Module imported successfully")
             
-            # Generate inputs
-            print("Generating inputs...")
-            inputs = self._generate_inputs(self.problem_spec)
-            print(f"Input shapes: {[inp.shape for inp in inputs]}")
             
             # Run the candidate kernel with timeout
-            print("Running candidate kernel with timeout...")
+            print("Module imported successfully. Running candidate kernel with timeout...")
             start_time = time.time()
             candidate_output = None
             
@@ -191,15 +190,15 @@ class LocalCPUEvaluator:
                     return False, latency_ms
             
             # For large matrices, check using statistical properties and sampling
-            print(f"Reference output: min={np.min(ref_output)}, max={np.max(ref_output)}, mean={np.mean(ref_output)}")
-            print(f"Candidate output: min={np.min(candidate_output)}, max={np.max(candidate_output)}, mean={np.mean(candidate_output)}")
+            print(f"Reference output: min={np.min(ref_output):.3f}, max={np.max(ref_output):.3f}, mean={np.mean(ref_output):.3f}")
+            print(f"Candidate output: min={np.min(candidate_output):.3f}, max={np.max(candidate_output):.3f}, mean={np.mean(candidate_output):.3f}")
             
             # Calculate and print various differences
             abs_diff = np.abs(ref_output - candidate_output)
             max_diff = np.max(abs_diff)
             mean_diff = np.mean(abs_diff)
             rel_diff = np.mean(np.abs(ref_output - candidate_output) / (np.abs(ref_output) + 1e-6))
-            print(f"Differences - max: {max_diff}, mean: {mean_diff}, relative: {rel_diff}")
+            print(f"Differences - max: {max_diff:.3f}, mean: {mean_diff:.3f}, relative: {rel_diff:.3f}")
             
             # Use higher tolerance for matrix multiplication since small differences can accumulate
             # with larger matrices due to floating-point precision and summation order differences
@@ -279,7 +278,7 @@ class LocalCPUEvaluator:
                     source_path, "-o", output_path
                 ]
                 
-                print(f"Compiling with command: {' '.join(cmd)}")
+                print(f"Compiling candidate kernel with command: {' '.join(cmd)}")
                 
                 result = subprocess.run(
                     cmd,
@@ -289,9 +288,11 @@ class LocalCPUEvaluator:
                 )
                 
                 if result.returncode != 0:
+                    print("*" * 50)
                     print(f"Compilation failed with return code: {result.returncode}")
-                    print(f"Stdout: {result.stdout.decode()}")
-                    print(f"Stderr: {result.stderr.decode()}")
+                    print(f"Stdout: {result.stdout.decode()[:2000]}")
+                    print(f"Stderr: {result.stderr.decode()[:2000]}")
+                    print("*" * 50)
                     return None
                 
                 # Make sure the file exists and is accessible
@@ -305,20 +306,22 @@ class LocalCPUEvaluator:
                 print(f"Compilation process error: {str(e)}")
                 return None
     
-    def _generate_reference_output(self, problem_spec: ProblemSpec) -> np.ndarray:
+    def _generate_reference_output(self, problem_spec: ProblemSpec, inputs) -> np.ndarray:
         """Generate reference output for the problem.
         
         Args:
             problem_spec: The problem specification
+            inputs: The inputs to the problem
             
         Returns:
             Reference output as numpy array
         """
         # For matmul problem
         if problem_spec.name == "matmul":
-            inputs = self._generate_inputs(problem_spec)
             a, b = inputs
-            return np.matmul(a, b)
+            output = np.matmul(a, b)
+            print(f"Generated output shape: {output.shape}, dtype={output.dtype}, range=[{np.min(output):.3f}, {np.max(output):.3f}]")
+            return output
         else:
             raise ValueError(f"Unknown problem: {problem_spec.name}")
     
@@ -342,8 +345,8 @@ class LocalCPUEvaluator:
             b = np.random.random(problem_spec.shape_b).astype(dtype)
             
             # Print some info about the inputs for debugging
-            print(f"Generated input A: shape={a.shape}, dtype={a.dtype}, range=[{np.min(a)}, {np.max(a)}]")
-            print(f"Generated input B: shape={b.shape}, dtype={b.dtype}, range=[{np.min(b)}, {np.max(b)}]")
+            print(f"Generated input A: shape={a.shape}, dtype={a.dtype}, range=[{np.min(a):.5f}, {np.max(a):.5f}]")
+            print(f"Generated input B: shape={b.shape}, dtype={b.dtype}, range=[{np.min(b):.5f}, {np.max(b):.5f}]")
             return a, b
         else:
             raise ValueError(f"Unknown problem: {problem_spec.name}")
