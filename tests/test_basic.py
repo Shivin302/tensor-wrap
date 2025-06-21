@@ -70,8 +70,8 @@ class TestBasicFunctionality(unittest.TestCase):
         )
         
         # Evaluate the kernel
-        evaluator = LocalCPUEvaluator(timeout_seconds=5)
-        is_correct, latency_ms = evaluator.evaluate(candidate, problem_spec)
+        evaluator = LocalCPUEvaluator(problem_path="tensorwrap/problems/matmul", timeout_seconds=5)
+        is_correct, latency_ms = evaluator.evaluate(candidate)
         
         # Check that the kernel is correctly evaluated
         self.assertTrue(is_correct, "Baseline kernel should be correct")
