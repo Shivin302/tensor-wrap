@@ -1,0 +1,12 @@
+openai
+google-generativeai
+ray
+duckdb
+rich
+pydantic
+pybind11
+pytest
+ruff
+jinja2
+numpy
+pyyaml

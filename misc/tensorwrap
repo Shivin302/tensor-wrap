@@ -1,0 +1,20 @@
+#!/bin/bash
+# Simple shell script to run the interactive TensorWrap program
+
+# Get the directory of this script
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
+
+# Check if Rich is installed, install if needed
+pip show rich &> /dev/null
+if [ $? -ne 0 ]; then
+    echo "Installing required dependency: rich"
+    pip install rich
+fi
+
+# Ensure we're using a properly interactive terminal
+export PYTHONIOENCODING=utf-8
+export TERM=xterm-256color
+
+# Run the interactive TensorWrap program in a way that ensures proper terminal handling
+python3 -c "import sys; sys.ps1=''; sys.ps2=''; exec(open('$SCRIPT_DIR/interactive_tensorwrap.py').read())"
+

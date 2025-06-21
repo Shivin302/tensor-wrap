@@ -1,0 +1,4 @@
+name: matmul
+shape_a: [512, 512]
+shape_b: [512, 512]
+dtype: float32

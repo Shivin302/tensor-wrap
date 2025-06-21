@@ -1,0 +1,21 @@
+
+Saurav:
+Hey A16Z, I’m Saurav — co-founder and CEO of TensorWrap. At Apple Special Projects, I slashed cloud spend by $30 million a year. I love making infra cheaper.
+Shivin:
+And I’m Shivin — co-founder and CTO. At Waymo, I optimized transformer models for self-driving cars, improving quality while cutting GPU spend at scale.
+Saurav:
+For LLMs, even a millisecond saved can translate to millions in GPU savings. Every AI company needs this—but there aren’t enough ML Performance Engineers to go around.
+Shivin:
+Indeed has over 4000 open roles for ML Performance Engineers. At $200K a pop, that’s $800 million in unmet hiring demand—every year.
+Saurav:
+TensorWrap is building agents that plug into your ML pipeline and auto-generate CUDA and Triton kernels—giving one generalist engineer the power of five performance specialists. Two YC startups we talked to are already excited.
+Shivin:
+Our custom kernels beat state-of-the-art compilers like TensorRT and Torch.Compile by up to 30%. Against native PyTorch or JAX, we’re up to 3× faster. Let’s show you what that looks like.
+
+Saurav:
+We’ve proven we can turn infra savings into massive dollars. Now we’re bringing that to the 4000+ AI startups burning through GPU budgets.
+[Cut to closing slide: TensorWrap logo + tagline]
+Voiceover:
+TensorWrap — AI agents that make your models faster, cheaper, and easier to scale.
+Let’s unlock AI performance—at scale.
+
