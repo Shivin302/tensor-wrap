@@ -269,7 +269,7 @@ class LocalCPUEvaluator:
             # Compile the code using g++ with pybind11
             try:
                 cmd = [
-                    "g++", "-O3", "-Wall", "-shared", "-std=c++14", "-fPIC", "-mavx2",
+                    "g++", "-O3", "-Wall", "-shared", "-std=c++14", "-fPIC", "-march=native", "-mtune=native",
                     f"-I{self.pybind11_include}",
                     f"-I{self.python_include}",
                     f"-I{self.python_include_config}",

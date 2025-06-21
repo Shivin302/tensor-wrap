@@ -122,8 +122,8 @@ class Orchestrator:
                 break
             
             # Get the best candidates from the previous round
-            # top_candidates = self.scorer.rank_candidates(prev_candidates, self.beam_width)
-            top_candidates = self.scorer.rank_candidates(prev_candidates, 1)
+            top_candidates = self.scorer.rank_candidates(prev_candidates, self.beam_width)
+            # top_candidates = self.scorer.rank_candidates(prev_candidates, 1)
             
             # Generate and evaluate new candidates
             round_candidates = []
@@ -224,7 +224,7 @@ def main():
     parser = argparse.ArgumentParser(description="TensorWrap kernel optimization search")
     parser.add_argument("--problem", type=str, default="tensorwrap/problems/matmul", help="Path to problem directory")
     parser.add_argument("--rounds", type=int, default=3, help="Number of optimization rounds")
-    parser.add_argument("--beam", type=int, default=2, help="Beam size (top-k candidates per round)")
+    parser.add_argument("--beam", type=int, default=4, help="Beam size (top-k candidates per round)")
     parser.add_argument("--dry-run", action="store_true", help="Dry run mode (no actual compilation)")
     parser.add_argument("--mode", default="generate", help="Mode: generate or evaluate")
     parser.add_argument("--db", default="kernels.db", help="Path to kernels database")
