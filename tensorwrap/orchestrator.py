@@ -7,7 +7,7 @@ from rich import print as rprint
 from .schemas import ProblemSpec, KernelCandidate
 from .ideas import IdeaGenerator
 from .codegen import CodeGenerator
-from .evaluator.local_cpu import LocalCPUEvaluator
+from .evaluator.cpp_cpu import MockEvaluator, LocalCPUEvaluator
 from .scorer import Scorer
 from .storage import Storage
 from .problems.matmul import example_kernels
@@ -24,7 +24,7 @@ class Orchestrator:
         problem_path: str,
         beam_width: int = 4,
         n_rounds: int = 3,
-        mode: str = "local_cpu",
+        mode: str = "cpp_cpu",
         dry_run: bool = False,
         db_path: str = "kernels.db"
     ):
@@ -34,7 +34,7 @@ class Orchestrator:
             problem_path: Path to the problem spec directory
             beam_width: Width of the beam search
             n_rounds: Number of optimization rounds
-            mode: Evaluation mode (local_cpu only for now)
+            mode: Evaluation mode (cpp_cpu only for now)
             dry_run: If True, use mock responses for testing without LLM API calls
             db_path: Path to kernels database
         """
@@ -56,7 +56,10 @@ class Orchestrator:
             abs_problem_path = problem_path
             
         # Use mock mode for evaluation only when in dry-run mode
-        self.evaluator = LocalCPUEvaluator(problem_path, mock_mode=dry_run)
+        if dry_run:
+            self.evaluator = MockEvaluator(problem_path)
+        else:
+            self.evaluator = LocalCPUEvaluator(problem_path)
 
         if dry_run or use_one_shot_kernels:
             self.code_generator = CodeGenerator(
@@ -223,8 +226,8 @@ def main():
     """Main entry point for the command line interface."""
     parser = argparse.ArgumentParser(description="TensorWrap kernel optimization search")
     parser.add_argument("--problem", type=str, default="tensorwrap/problems/matmul", help="Path to problem directory")
-    parser.add_argument("--rounds", type=int, default=3, help="Number of optimization rounds")
-    parser.add_argument("--beam", type=int, default=4, help="Beam size (top-k candidates per round)")
+    parser.add_argument("--rounds", type=int, default=2, help="Number of optimization rounds")
+    parser.add_argument("--beam", type=int, default=2, help="Beam size (top-k candidates per round)")
     parser.add_argument("--dry-run", action="store_true", help="Dry run mode (no actual compilation)")
     parser.add_argument("--mode", default="generate", help="Mode: generate or evaluate")
     parser.add_argument("--db", default="kernels.db", help="Path to kernels database")

@@ -7,7 +7,7 @@ import numpy as np
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from tensorwrap.schemas import ProblemSpec, KernelCandidate
-from tensorwrap.evaluator.local_cpu import LocalCPUEvaluator
+from tensorwrap.evaluator.cpp_cpu import LocalCPUEvaluator
 
 class TestBasicFunctionality(unittest.TestCase):
     """Basic tests for TensorWrap functionality."""
