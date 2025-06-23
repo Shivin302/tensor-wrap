@@ -7,7 +7,8 @@ from rich import print as rprint
 from .schemas import ProblemSpec, KernelCandidate
 from .ideas import IdeaGenerator
 from .codegen import CodeGenerator, SelfHealingCodeGenerator
-from .evaluator.cpp_cpu import MockEvaluator, LocalCPUEvaluator
+from .evaluator.evaluator_utils import Evaluator
+from .evaluator.cpp_cpu import MockEvaluator, LocalCPUCompiler
 from .evaluator.triton_gpu import TritonGPUEvaluator
 from .evaluator.cuda_gpu import CudaGPUEvaluator
 from .scorer import Scorer
@@ -59,7 +60,8 @@ class Orchestrator:
             self.evaluator = MockEvaluator(problem_path)
         else:
             if mode == "cpp_cpu":
-                self.evaluator = LocalCPUEvaluator(problem_path)
+                compiler = LocalCPUCompiler()
+                self.evaluator = Evaluator(problem_path, compiler)
             elif mode == "triton_gpu":
                 self.evaluator = TritonGPUEvaluator(problem_path)
             elif mode == "cuda_gpu":

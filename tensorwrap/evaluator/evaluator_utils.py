@@ -7,9 +7,13 @@ import numpy as np
 import sysconfig
 from typing import Dict, Tuple, Optional, Any, List
 import pybind11
+import sys
 from ..schemas import ProblemSpec, KernelCandidate
 import importlib.util
 import yaml
+import hashlib
+import tempfile
+
 
 
 class TimeoutError(Exception):
@@ -27,27 +31,13 @@ def timeout_handler(signum, frame):
 
 
 
+class Compiler:
 
-class Evaluator:
-    """Evaluates kernel candidates."""
-    
-    def __init__(self, problem_path: str, timeout_seconds: int = 2):
-        """Initialize the evaluator.
-        
-        Args:
-            problem_path: Path to the problem directory
-            timeout_seconds: Timeout for kernel execution in seconds
-        """
-        self.problem_path = problem_path
-        self.timeout_seconds = timeout_seconds
+    def __init__(self):
         self._setup_pybind11_info()
-        self._load_problem_spec()
-        
+
     def _setup_pybind11_info(self):
         """Setup pybind11 include paths for compilation."""
-        import pybind11
-        import sys
-        
         # Get pybind11 include path
         self.pybind11_include = pybind11.get_include()
         
@@ -58,7 +48,91 @@ class Evaluator:
         # Get Python library path
         self.python_lib = sysconfig.get_config_var('LIBDIR')
         self.python_version = sysconfig.get_config_var('VERSION')
+
+    def compile(self, code: str) -> Optional[str]:
+        """Compile kernel code using pybind11.
         
+        Args:
+            code: The kernel code to compile
+            
+        Returns:
+            Path to the compiled module, or None if compilation failed
+        """
+        
+        # Create a more persistent output directory if it doesn't exist
+        output_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "compiled")
+        os.makedirs(output_dir, exist_ok=True)
+        
+        # Generate a unique filename for this kernel
+        kernel_hash = hashlib.md5(code.encode()).hexdigest()[:8]
+        output_path = os.path.join(output_dir, f"candidate_{kernel_hash}.so")
+        
+        # Create a temporary directory for compilation
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Write the source code to a file
+            source_path = os.path.join(tmpdir, "candidate.cpp")
+            with open(source_path, "w") as f:
+                f.write(code)
+            
+            compile_cmd = self.get_compile_command(source_path, output_path)
+            
+            self.run_compile(compile_cmd, output_path)
+
+        return output_path
+
+
+    def get_compile_command(self, source_path: str, output_path: str) -> List[str]:
+        raise NotImplementedError
+
+
+    def run_compile(self, compile_cmd: List[str], output_path: str) -> Optional[str]:
+        try:
+            print(f"Compiling candidate kernel with command: {' '.join(compile_cmd)}")
+            
+            result = subprocess.run(
+                compile_cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                check=False  # Don't raise exception so we can log more details
+            )
+            
+            if result.returncode != 0:
+                print("*" * 80)
+                print(f"Compilation failed with return code: {result.returncode}")
+                print(f"Stdout: {result.stdout.decode()[:2000]}")
+                print(f"Stderr: {result.stderr.decode()[:2000]}")
+                print("*" * 80)
+                return None
+            
+            # Make sure the file exists and is accessible
+            if os.path.exists(output_path):
+                print(f"Successfully compiled kernel to {output_path}")
+                return output_path
+            else:
+                print(f"Compilation succeeded but output file not found at {output_path}")
+                return None
+        except Exception as e:
+            print(f"Compilation process error: {str(e)}")
+            return None
+
+
+
+
+class Evaluator:
+    """Evaluates kernel candidates."""
+    
+    def __init__(self, problem_path: str, compiler: Compiler):
+        """Initialize the evaluator.
+        
+        Args:
+            problem_path: Path to the problem directory
+            compiler: Compiler instance to use for compilation
+        """
+        self.problem_path = problem_path
+        self.timeout_seconds = 2
+        self._load_problem_spec()
+        self._compiler = compiler
+         
     def _load_problem_spec(self):
         """Load problem specification from yaml file."""
         spec_yaml_path = os.path.join(self.problem_path, "spec.yaml")
@@ -75,6 +149,7 @@ class Evaluator:
             dtype=spec_data["dtype"]
         )
     
+
     def evaluate(self, candidate: KernelCandidate) -> Tuple[bool, Optional[float]]:
         """Evaluate a kernel candidate.
         
@@ -97,7 +172,7 @@ class Evaluator:
             ref_output = self._generate_reference_output(self.problem_spec, inputs)
             
             print()
-            module_path = self.compile(candidate.code)
+            module_path = self._compiler.compile(candidate.code)
             if not module_path:
                 print("Compilation failed, returning False")
                 return False, None
@@ -201,39 +276,6 @@ class Evaluator:
             print(f"Evaluation failed: {e}")
             return False, None
     
-    def compile(self, code: str) -> Optional[str]:
-        raise NotImplementedError
-    
-    def run_compile(self, compile_cmd: List[str], output_path: str) -> Optional[str]:
-        try:
-            print(f"Compiling candidate kernel with command: {' '.join(compile_cmd)}")
-            
-            result = subprocess.run(
-                compile_cmd,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                check=False  # Don't raise exception so we can log more details
-            )
-            
-            if result.returncode != 0:
-                print("*" * 80)
-                print(f"Compilation failed with return code: {result.returncode}")
-                print(f"Stdout: {result.stdout.decode()[:2000]}")
-                print(f"Stderr: {result.stderr.decode()[:2000]}")
-                print("*" * 80)
-                return None
-            
-            # Make sure the file exists and is accessible
-            if os.path.exists(output_path):
-                print(f"Successfully compiled kernel to {output_path}")
-                return output_path
-            else:
-                print(f"Compilation succeeded but output file not found at {output_path}")
-                return None
-        except Exception as e:
-            print(f"Compilation process error: {str(e)}")
-            return None
-
 
     def _generate_reference_output(self, problem_spec: ProblemSpec, inputs) -> np.ndarray:
         """Generate reference output for the problem.
@@ -252,6 +294,7 @@ class Evaluator:
         print(f"Generated output shape: {output.shape}, dtype={output.dtype}, range=[{np.min(output):.3f}, {np.max(output):.3f}]")
         return output
     
+
     def _generate_inputs(self, problem_spec: ProblemSpec) -> Tuple[np.ndarray, ...]:
         """Generate inputs for the problem.
         
@@ -273,3 +316,4 @@ class Evaluator:
         print(f"Generated input A: shape={a.shape}, dtype={a.dtype}, range=[{np.min(a):.5f}, {np.max(a):.5f}]")
         print(f"Generated input B: shape={b.shape}, dtype={b.dtype}, range=[{np.min(b):.5f}, {np.max(b):.5f}]")
         return a, b
+

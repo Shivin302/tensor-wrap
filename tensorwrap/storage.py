@@ -13,6 +13,7 @@ class Storage:
             db_path: Path to the database file
         """
         self.db_path = db_path
+        return None
         self.conn = duckdb.connect(db_path)
         self._init_schema()
     
