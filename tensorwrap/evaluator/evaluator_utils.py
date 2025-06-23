@@ -8,6 +8,7 @@ import sysconfig
 from typing import Dict, Tuple, Optional, Any
 import pybind11
 from ..schemas import ProblemSpec, KernelCandidate
+import importlib.util
 
 
 class TimeoutError(Exception):
@@ -117,7 +118,6 @@ class Evaluator:
                 
             print()
             print(f"Importing compiled module from {module_path}...")
-            import importlib.util
             spec = importlib.util.spec_from_file_location("candidate", module_path)
             module = importlib.util.module_from_spec(spec)
             spec.loader.exec_module(module)
@@ -228,14 +228,12 @@ class Evaluator:
         Returns:
             Reference output as numpy array
         """
-        # For matmul problem
-        if problem_spec.name == "matmul":
-            a, b = inputs
-            output = np.matmul(a, b)
-            print(f"Generated output shape: {output.shape}, dtype={output.dtype}, range=[{np.min(output):.3f}, {np.max(output):.3f}]")
-            return output
-        else:
-            raise ValueError(f"Unknown problem: {problem_spec.name}")
+        spec = importlib.util.spec_from_file_location(problem_spec.name, self.problem_path + "/ref_impl.py")
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        output = module.kernel(*inputs)
+        print(f"Generated output shape: {output.shape}, dtype={output.dtype}, range=[{np.min(output):.3f}, {np.max(output):.3f}]")
+        return output
     
     def _generate_inputs(self, problem_spec: ProblemSpec) -> Tuple[np.ndarray, ...]:
         """Generate inputs for the problem.

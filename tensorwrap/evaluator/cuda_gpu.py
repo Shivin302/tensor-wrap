@@ -14,7 +14,7 @@ from ..schemas import ProblemSpec, KernelCandidate
 from .evaluator_utils import Evaluator, timeout_handler
 
 
-class CudaGpuEvaluator(Evaluator):
+class CudaGPUEvaluator(Evaluator):
     """Evaluates CUDA C++ kernel candidates on the GPU."""
 
     def __init__(self, problem_path: str, timeout_seconds: int = 10):

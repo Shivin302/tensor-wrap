@@ -1,6 +1,6 @@
 import numpy as np
 
-def matmul_reference(a: np.ndarray, b: np.ndarray) -> np.ndarray:
+def kernel(a: np.ndarray, b: np.ndarray) -> np.ndarray:
     """Reference implementation for matrix multiplication using NumPy.
     
     Args:

@@ -4,7 +4,7 @@ import jinja2
 from typing import List, Optional, Dict, Any, Union
 
 from .llm_api import LLMClient
-from .problems.matmul import example_kernels
+from .problems.matmul import kernels as matmul_kernels
 
 from dataclasses import dataclass
 from pathlib import Path
@@ -118,14 +118,14 @@ class CodeGenerator(LLMClient):
         """
         # Create a simple optimization based on the idea
         if "shared memory" in idea.lower():
-            return example_kernels.shared_memory
+            return matmul_kernels.shared_memory
         elif "tiling" in idea.lower() or "blocking" in idea.lower():
-            return example_kernels.tiling
+            return matmul_kernels.tiling
         elif "unroll" in idea.lower():
-            return example_kernels.unroll
+            return matmul_kernels.unroll
         else:
             # Default optimization with vectorization
-            return example_kernels.vectorize
+            return matmul_kernels.vectorize
     
 
     def _extract_code(self, text: str) -> Optional[str]:

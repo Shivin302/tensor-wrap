@@ -10,7 +10,7 @@ from typing import Tuple, Optional, override
 from ..schemas import ProblemSpec, KernelCandidate
 from .evaluator_utils import Evaluator, timeout_handler
 
-class TritonEvaluator(Evaluator):
+class TritonGPUEvaluator(Evaluator):
     """Evaluator for Triton kernels."""
     
     def __init__(self, problem_path: str, timeout_seconds: int = 2):

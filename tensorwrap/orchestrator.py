@@ -6,15 +6,14 @@ from rich import print as rprint
 
 from .schemas import ProblemSpec, KernelCandidate
 from .ideas import IdeaGenerator
-from .codegen import CodeGenerator
+from .codegen import CodeGenerator, SelfHealingCodeGenerator
 from .evaluator.cpp_cpu import MockEvaluator, LocalCPUEvaluator
+from .evaluator.triton_gpu import TritonGPUEvaluator
+from .evaluator.cuda_gpu import CudaGPUEvaluator
 from .scorer import Scorer
 from .storage import Storage
-from .problems.matmul import example_kernels
-from .optimizer import SelfHealingCodeGenerator
 
-
-use_one_shot_kernels = False
+use_one_shot_kernels = True
 
 class Orchestrator:
     """Main orchestrator for the kernel optimization search process."""
@@ -34,7 +33,7 @@ class Orchestrator:
             problem_path: Path to the problem spec directory
             beam_width: Width of the beam search
             n_rounds: Number of optimization rounds
-            mode: Evaluation mode (cpp_cpu only for now)
+            mode: Evaluation mode (cpp_cpu, triton_gpu, cuda_gpu)
             dry_run: If True, use mock responses for testing without LLM API calls
             db_path: Path to kernels database
         """
@@ -59,7 +58,12 @@ class Orchestrator:
         if dry_run:
             self.evaluator = MockEvaluator(problem_path)
         else:
-            self.evaluator = LocalCPUEvaluator(problem_path)
+            if mode == "cpp_cpu":
+                self.evaluator = LocalCPUEvaluator(problem_path)
+            elif mode == "triton_gpu":
+                self.evaluator = TritonGPUEvaluator(problem_path)
+            elif mode == "cuda_gpu":
+                self.evaluator = CudaGPUEvaluator(problem_path)
 
         if dry_run or use_one_shot_kernels:
             self.code_generator = CodeGenerator(
@@ -213,23 +217,19 @@ class Orchestrator:
         Returns:
             The baseline kernel code
         """
-        # Get the problem name from the path
-        problem_name = self.problem_path.split('/')[-1]
+        baseline_kernel_path = self.problem_path + "/baseline.txt"
         
-        # For matmul problem, use a simple C++ implementation
-        if problem_name == "matmul":
-            return example_kernels.slow
-        else:
-            raise ValueError(f"Unknown problem: {self.problem_spec.name}")
+        with open(baseline_kernel_path, "r") as f:
+            return f.read()
 
 def main():
     """Main entry point for the command line interface."""
     parser = argparse.ArgumentParser(description="TensorWrap kernel optimization search")
     parser.add_argument("--problem", type=str, default="tensorwrap/problems/matmul", help="Path to problem directory")
-    parser.add_argument("--rounds", type=int, default=2, help="Number of optimization rounds")
+    parser.add_argument("--rounds", type=int, default=1, help="Number of optimization rounds")
     parser.add_argument("--beam", type=int, default=2, help="Beam size (top-k candidates per round)")
     parser.add_argument("--dry-run", action="store_true", help="Dry run mode (no actual compilation)")
-    parser.add_argument("--mode", default="generate", help="Mode: generate or evaluate")
+    parser.add_argument("--mode", default="cpp_cpu", help="Mode: cpp_cpu, triton_gpu, cuda_gpu")
     parser.add_argument("--db", default="kernels.db", help="Path to kernels database")
     args = parser.parse_args()
     
