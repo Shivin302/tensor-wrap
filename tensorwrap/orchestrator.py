@@ -225,7 +225,7 @@ class Orchestrator:
 def main():
     """Main entry point for the command line interface."""
     parser = argparse.ArgumentParser(description="TensorWrap kernel optimization search")
-    parser.add_argument("--problem", type=str, default="tensorwrap/problems/matmul", help="Path to problem directory")
+    parser.add_argument("--problem", type=str, default="tensorwrap/problems/conv2d", help="Path to problem directory")
     parser.add_argument("--rounds", type=int, default=1, help="Number of optimization rounds")
     parser.add_argument("--beam", type=int, default=2, help="Beam size (top-k candidates per round)")
     parser.add_argument("--dry-run", action="store_true", help="Dry run mode (no actual compilation)")

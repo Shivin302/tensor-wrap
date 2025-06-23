@@ -9,6 +9,7 @@ from typing import Dict, Tuple, Optional, Any
 import pybind11
 from ..schemas import ProblemSpec, KernelCandidate
 import importlib.util
+import yaml
 
 
 class TimeoutError(Exception):
@@ -60,34 +61,19 @@ class Evaluator:
         
     def _load_problem_spec(self):
         """Load problem specification from yaml file."""
-        import yaml
-        try:
-            spec_yaml_path = os.path.join(self.problem_path, "spec.yaml")
-            print(f"Path {spec_yaml_path} exists: {os.path.exists(spec_yaml_path)}")
-            
-            with open(spec_yaml_path, "r") as f:
-                spec_data = yaml.safe_load(f)
-                print(f"Loaded spec data: {spec_data}")
-        except Exception as e:
-            print(f"Error loading spec.yaml: {e}")
-            raise
-            
-        # Extract the problem name from the path (use basename to get directory name)
-        problem_name = os.path.basename(os.path.normpath(self.problem_path))
-        print(f"Extracted problem name: '{problem_name}'")
+        spec_yaml_path = os.path.join(self.problem_path, "spec.yaml")
+        print(f"Path {spec_yaml_path} exists: {os.path.exists(spec_yaml_path)}")
         
-        # Create ProblemSpec object - handle paths flexibly
-        if "matmul" in problem_name.lower():
-            # Found matrix multiplication problem
-            problem_name = "matmul"  # Standardize the name
-            self.problem_spec = ProblemSpec(
-                name=problem_name,
-                shape_a=spec_data.get("shape_a", [512, 512]),
-                shape_b=spec_data.get("shape_b", [512, 512]),
-                dtype=spec_data.get("dtype", "float32")
-            )
-        else:
-            raise ValueError(f"Unknown problem: {problem_name}. Currently only 'matmul' is supported.")
+        with open(spec_yaml_path, "r") as f:
+            spec_data = yaml.safe_load(f)
+            print(f"Loaded spec data: {spec_data}")
+                
+        self.problem_spec = ProblemSpec(
+            name=spec_data["name"],
+            shape_a=spec_data["shape_a"],
+            shape_b=spec_data["shape_b"],
+            dtype=spec_data["dtype"]
+        )
     
     def evaluate(self, candidate: KernelCandidate) -> Tuple[bool, Optional[float]]:
         """Evaluate a kernel candidate.
@@ -244,19 +230,15 @@ class Evaluator:
         Returns:
             Tuple of input arrays
         """
-        # For matmul problem
-        if problem_spec.name == "matmul":
-            # Set a fixed seed for reproducibility
-            np.random.seed(42)
+        # Set a fixed seed for reproducibility
+        np.random.seed(69420)
             
-            # Generate input arrays with values between 0.0 and 1.0
-            dtype = np.dtype(problem_spec.dtype)
-            a = np.random.random(problem_spec.shape_a).astype(dtype)
-            b = np.random.random(problem_spec.shape_b).astype(dtype)
+        # Generate input arrays with values between 0.0 and 1.0
+        dtype = np.dtype(problem_spec.dtype)
+        a = np.random.random(problem_spec.shape_a).astype(dtype)
+        b = np.random.random(problem_spec.shape_b).astype(dtype)
             
-            # Print some info about the inputs for debugging
-            print(f"Generated input A: shape={a.shape}, dtype={a.dtype}, range=[{np.min(a):.5f}, {np.max(a):.5f}]")
-            print(f"Generated input B: shape={b.shape}, dtype={b.dtype}, range=[{np.min(b):.5f}, {np.max(b):.5f}]")
-            return a, b
-        else:
-            raise ValueError(f"Unknown problem: {problem_spec.name}")
+        # Print some info about the inputs for debugging
+        print(f"Generated input A: shape={a.shape}, dtype={a.dtype}, range=[{np.min(a):.5f}, {np.max(a):.5f}]")
+        print(f"Generated input B: shape={b.shape}, dtype={b.dtype}, range=[{np.min(b):.5f}, {np.max(b):.5f}]")
+        return a, b

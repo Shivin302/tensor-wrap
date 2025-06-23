@@ -1,0 +1,4 @@
+name: conv1d
+shape_a: [1024,1024]
+shape_b: [7,7]
+dtype: float32

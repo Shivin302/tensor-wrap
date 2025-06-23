@@ -1,4 +1,4 @@
 name: conv1d
-shape_a: [65536]
+shape_a: [1048576]
 shape_b: [512]
 dtype: float32

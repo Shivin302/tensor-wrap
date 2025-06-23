@@ -39,6 +39,7 @@ class Storage:
         Returns:
             The ID of the saved candidate
         """
+        return None
         # Get the next available ID
         result = self.conn.execute("SELECT COALESCE(MAX(id), 0) + 1 FROM kernels")
         next_id = result.fetchone()[0]
