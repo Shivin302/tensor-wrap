@@ -5,7 +5,7 @@ import tempfile
 import subprocess
 import numpy as np
 import sysconfig
-from typing import Dict, Tuple, Optional, Any
+from typing import Dict, Tuple, Optional, Any, List
 import pybind11
 from ..schemas import ProblemSpec, KernelCandidate
 import importlib.util
@@ -97,7 +97,7 @@ class Evaluator:
             ref_output = self._generate_reference_output(self.problem_spec, inputs)
             
             print()
-            module_path = self._compile(candidate.code)
+            module_path = self.compile(candidate.code)
             if not module_path:
                 print("Compilation failed, returning False")
                 return False, None
@@ -201,9 +201,40 @@ class Evaluator:
             print(f"Evaluation failed: {e}")
             return False, None
     
-    def _compile(self, code: str, func_name: str = "kernel") -> Optional[str]:
+    def compile(self, code: str) -> Optional[str]:
         raise NotImplementedError
     
+    def run_compile(self, compile_cmd: List[str], output_path: str) -> Optional[str]:
+        try:
+            print(f"Compiling candidate kernel with command: {' '.join(compile_cmd)}")
+            
+            result = subprocess.run(
+                compile_cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                check=False  # Don't raise exception so we can log more details
+            )
+            
+            if result.returncode != 0:
+                print("*" * 80)
+                print(f"Compilation failed with return code: {result.returncode}")
+                print(f"Stdout: {result.stdout.decode()[:2000]}")
+                print(f"Stderr: {result.stderr.decode()[:2000]}")
+                print("*" * 80)
+                return None
+            
+            # Make sure the file exists and is accessible
+            if os.path.exists(output_path):
+                print(f"Successfully compiled kernel to {output_path}")
+                return output_path
+            else:
+                print(f"Compilation succeeded but output file not found at {output_path}")
+                return None
+        except Exception as e:
+            print(f"Compilation process error: {str(e)}")
+            return None
+
+
     def _generate_reference_output(self, problem_spec: ProblemSpec, inputs) -> np.ndarray:
         """Generate reference output for the problem.
         

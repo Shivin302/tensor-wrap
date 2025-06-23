@@ -1,7 +1,8 @@
 slow = """
+#include <pybind11/pybind11.h>
+#include <pybind11/numpy.h>
 #include <cstddef>
 #include <cmath>
-#include <pybind11/numpy.h>
 namespace py = pybind11;
 
 // Helper function to access matrix element
@@ -59,14 +60,19 @@ py::array_t<float> kernel(py::array_t<float> a, py::array_t<float> b) {
     
     return result;
 }
+
+PYBIND11_MODULE(candidate, m) {{
+    m.def("kernel", &kernel);
+}}
 """
 
 
 
 basic = """
+#include <pybind11/pybind11.h>
+#include <pybind11/numpy.h>
 #include <cstddef>
 #include <cmath>
-#include <pybind11/numpy.h>
 namespace py = pybind11;
 
 // Define a simple matrix multiplication function that attempts to mimic NumPy's behavior
@@ -112,6 +118,10 @@ py::array_t<float> kernel(py::array_t<float> a, py::array_t<float> b) {
     
     return result;
 }
+
+PYBIND11_MODULE(candidate, m) {{
+    m.def("kernel", &kernel);
+}}
 """
 
 
@@ -120,6 +130,9 @@ py::array_t<float> kernel(py::array_t<float> a, py::array_t<float> b) {
 vectorize = """
 #include <pybind11/pybind11.h>
 #include <pybind11/numpy.h>
+#include <cstddef>
+#include <cmath>
+namespace py = pybind11;
 
 // Default optimized matmul kernel
 void matmul_kernel(const float* A, const float* B, float* C, int M, int N, int K) {
@@ -138,7 +151,6 @@ void matmul_kernel(const float* A, const float* B, float* C, int M, int N, int K
     }
 }
 
-namespace py = pybind11;
 
 PYBIND11_MODULE(kernel, m) {
     m.def("matmul", [](py::array_t<float> A, py::array_t<float> B) {
@@ -177,6 +189,9 @@ PYBIND11_MODULE(kernel, m) {
 shared_memory = """
 #include <pybind11/pybind11.h>
 #include <pybind11/numpy.h>
+#include <cstddef>
+#include <cmath>
+namespace py = pybind11;
 
 // Optimized matmul kernel using shared memory
 void matmul_kernel(const float* A, const float* B, float* C, int M, int N, int K) {
@@ -223,7 +238,6 @@ void matmul_kernel(const float* A, const float* B, float* C, int M, int N, int K
     }
 }
 
-namespace py = pybind11;
 
 PYBIND11_MODULE(kernel, m) {
     m.def("matmul", [](py::array_t<float> A, py::array_t<float> B) {
@@ -261,6 +275,9 @@ PYBIND11_MODULE(kernel, m) {
 tiling = """
 #include <pybind11/pybind11.h>
 #include <pybind11/numpy.h>
+#include <cstddef>
+#include <cmath>
+namespace py = pybind11;
 
 // Optimized matmul kernel using tiling/blocking
 void matmul_kernel(const float* A, const float* B, float* C, int M, int N, int K) {
@@ -292,7 +309,6 @@ void matmul_kernel(const float* A, const float* B, float* C, int M, int N, int K
     }
 }
 
-namespace py = pybind11;
 
 PYBIND11_MODULE(kernel, m) {
     m.def("matmul", [](py::array_t<float> A, py::array_t<float> B) {
@@ -329,6 +345,9 @@ PYBIND11_MODULE(kernel, m) {
 unroll = """
 #include <pybind11/pybind11.h>
 #include <pybind11/numpy.h>
+#include <cstddef>
+#include <cmath>
+namespace py = pybind11;
 
 // Optimized matmul kernel with loop unrolling
 void matmul_kernel(const float* A, const float* B, float* C, int M, int N, int K) {
@@ -359,8 +378,6 @@ void matmul_kernel(const float* A, const float* B, float* C, int M, int N, int K
         }
     }
 }
-
-namespace py = pybind11;
 
 PYBIND11_MODULE(kernel, m) {
     m.def("matmul", [](py::array_t<float> A, py::array_t<float> B) {

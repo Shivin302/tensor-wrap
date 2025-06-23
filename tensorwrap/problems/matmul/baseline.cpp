@@ -1,6 +1,7 @@
+#include <pybind11/pybind11.h>
+#include <pybind11/numpy.h>
 #include <cstddef>
 #include <cmath>
-#include <pybind11/numpy.h>
 namespace py = pybind11;
 
 // Define a simple matrix multiplication function that attempts to mimic NumPy's behavior
@@ -46,3 +47,7 @@ py::array_t<float> kernel(py::array_t<float> a, py::array_t<float> b) {
     
     return result;
 }
+
+PYBIND11_MODULE(candidate, m) {{
+    m.def("kernel", &kernel);
+}}

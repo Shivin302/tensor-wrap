@@ -217,7 +217,7 @@ class Orchestrator:
         Returns:
             The baseline kernel code
         """
-        baseline_kernel_path = self.problem_path + "/baseline.txt"
+        baseline_kernel_path = self.problem_path + "/baseline.cpp"
         
         with open(baseline_kernel_path, "r") as f:
             return f.read()
@@ -225,7 +225,7 @@ class Orchestrator:
 def main():
     """Main entry point for the command line interface."""
     parser = argparse.ArgumentParser(description="TensorWrap kernel optimization search")
-    parser.add_argument("--problem", type=str, default="tensorwrap/problems/conv2d", help="Path to problem directory")
+    parser.add_argument("--problem", type=str, default="matmul", help="directory name in tensorwrap/problems")
     parser.add_argument("--rounds", type=int, default=1, help="Number of optimization rounds")
     parser.add_argument("--beam", type=int, default=2, help="Beam size (top-k candidates per round)")
     parser.add_argument("--dry-run", action="store_true", help="Dry run mode (no actual compilation)")
@@ -234,7 +234,7 @@ def main():
     args = parser.parse_args()
     
     # Determine problem path
-    problem_path = args.problem
+    problem_path = "tensorwrap/problems/" + args.problem
     
     # Create and run orchestrator
     orchestrator = Orchestrator(

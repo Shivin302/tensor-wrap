@@ -1,7 +1,7 @@
-#include <cstddef>
-#include <vector>
+#include <pybind11/pybind11.h>
 #include <pybind11/numpy.h>
-
+#include <cstddef>
+#include <cmath>
 namespace py = pybind11;
 
 
@@ -43,3 +43,7 @@ py::array_t<float> kernel(py::array_t<float> a, py::array_t<float> b) {
 
     return result;
 }
+
+PYBIND11_MODULE(candidate, m) {{
+    m.def("kernel", &kernel);
+}}
