@@ -49,6 +49,7 @@ class Compiler:
         self.python_lib = sysconfig.get_config_var('LIBDIR')
         self.python_version = sysconfig.get_config_var('VERSION')
 
+
     def compile(self, code: str) -> Optional[str]:
         """Compile kernel code using pybind11.
         
@@ -58,6 +59,7 @@ class Compiler:
         Returns:
             Path to the compiled module, or None if compilation failed
         """
+        code = self.process_code(code)
         
         # Create a more persistent output directory if it doesn't exist
         output_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "compiled")
@@ -76,9 +78,14 @@ class Compiler:
             
             compile_cmd = self.get_compile_command(source_path, output_path)
             
-            self.run_compile(compile_cmd, output_path)
+            output_path = self.run_compile(compile_cmd, output_path)
 
         return output_path
+
+
+    def process_code(self, code: str) -> str:
+        """Process the code before compilation."""
+        return code
 
 
     def get_compile_command(self, source_path: str, output_path: str) -> List[str]:
@@ -148,7 +155,7 @@ class Evaluator:
             shape_b=spec_data["shape_b"],
             dtype=spec_data["dtype"]
         )
-    
+        
 
     def evaluate(self, candidate: KernelCandidate) -> Tuple[bool, Optional[float]]:
         """Evaluate a kernel candidate.
@@ -161,9 +168,6 @@ class Evaluator:
             If evaluation fails, returns (False, None)
         """
         try:
-            print("Starting real evaluation mode...")
-
-            print()
             print("Generating inputs...")
             inputs = self._generate_inputs(self.problem_spec)
 
@@ -276,6 +280,21 @@ class Evaluator:
             print(f"Evaluation failed: {e}")
             return False, None
     
+    
+    def run_reference(self):
+        """Run the reference implementation."""
+        print("Generating inputs...")
+        inputs = self._generate_inputs(self.problem_spec)
+
+        print()
+        print("Generating reference output...")
+        start_time = time.time()
+        ref_output = self._generate_reference_output(self.problem_spec, inputs)
+        end_time = time.time()
+        latency_ms = (end_time - start_time) * 1000
+
+        return latency_ms
+        
 
     def _generate_reference_output(self, problem_spec: ProblemSpec, inputs) -> np.ndarray:
         """Generate reference output for the problem.

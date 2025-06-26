@@ -6,9 +6,8 @@ PROBLEM SPECIFICATION:
 
 
 BASELINE CODE:
-```cpp
 {{ baseline_code }}
-```
+
 
 OPTIMIZATION IDEA:
 {{ idea }}
@@ -16,7 +15,7 @@ OPTIMIZATION IDEA:
 Create an optimized version of this kernel that implements the optimization idea.
 The code must:
 1. Be compilable C++ with pybind11 for CPU (not CUDA/GPU)
-2. Maintain the same function signature: py::array_t<float> kernel(py::array_t<float> a, py::array_t<float> b)
+2. Have the name of the module be candidate
 3. Produce numerically equivalent results
 4. Implement the optimization idea effectively but for CPU only
 5. Include helpful comments explaining key optimizations

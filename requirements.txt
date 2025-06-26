@@ -10,3 +10,4 @@ ruff
 jinja2
 numpy
 pyyaml
+jax[cuda12]

@@ -84,44 +84,41 @@ class Orchestrator:
         self.problem_spec = self.evaluator.problem_spec
         self.scorer = Scorer()
         
+
     def run(self) -> Optional[KernelCandidate]:
         """Run the optimization search process.
         
         Returns:
             The best kernel candidate found, or None if no valid candidates
         """
-        # Get baseline kernel code
-        baseline_code = self._get_baseline_kernel()
+        reference_code = self._get_reference_kernel()
         
-        # Get the problem name from the path
-        problem_name = self.problem_path.split('/')[-1]
-        
-        # Store baseline as round 0
-        baseline = KernelCandidate(
-            problem=problem_name,
+        reference = KernelCandidate(
+            problem=self.problem_spec.name,
             round=0,
-            code=baseline_code,
-            idea="Baseline implementation"
+            code=reference_code,
+            idea="reference implementation"
         )
         
-        # Evaluate baseline
-        is_correct, latency_ms = self.evaluator.evaluate(baseline)
-        baseline.correct = is_correct
-        baseline.latency_ms = latency_ms
+        # Evaluate reference
+        latency_ms = self.evaluator.run_reference()
+        reference.latency_ms = latency_ms
         
-        # Save baseline to storage
-        baseline.id = self.storage.save_candidate(baseline)
+        # Save reference to storage
+        reference.id = self.storage.save_candidate(reference)
         
         # Format the latency, handling None values
-        latency_display = f"{baseline.latency_ms:.2f}ms" if baseline.latency_ms is not None else "N/A"
-        rprint(f"[bold green]Baseline[/bold green]: correct={baseline.correct}, latency={latency_display}")
+        latency_display = f"{reference.latency_ms:.2f}ms" if reference.latency_ms is not None else "N/A"
+        rprint(f"[bold green]reference[/bold green]: latency={latency_display}")
         
-        # Start with baseline as best candidate
-        best_candidate = baseline if baseline.correct else None
-        
-        # Keep track of candidates from the previous round
-        prev_candidates = [baseline] if baseline.correct else []
-        
+        self.best_candidate = reference
+        reference_idea = "Write a C++ implementation of this python code"
+        candidate = self.optimize_idea(reference, reference_idea, 0)
+        # Update best candidate
+        if candidate.correct and (self.best_candidate is None or candidate.latency_ms < self.best_candidate.latency_ms):
+            self.best_candidate = candidate
+        prev_candidates = [candidate]
+
         # Run optimization rounds
         for round_num in range(1, self.n_rounds + 1):
             rprint(f"\n[bold blue]Round {round_num}/{self.n_rounds}[/bold blue]")
@@ -138,90 +135,106 @@ class Orchestrator:
             round_candidates = []
             
             for parent in top_candidates:
-                # Generate ideas
-                ideas = self.idea_generator.generate_ideas(parent.code, self.beam_width)
-                
-                print("-" * 120)
-                for idea in ideas:
-                    print("-" * 120)
+                parent_candidates = self.optimize_candidate(parent, round_num)
+                round_candidates.extend(parent_candidates)
 
-                    idea_title = idea.split("\n")[0]
-                    rprint(f"[bold blue]{idea_title}[/bold blue]")
 
-                    # Generate code from idea - may return code string or dict with metadata
-                    code_result = self.code_generator.generate_code(parent.code, idea, self.problem_spec)
-                    
-                    # Handle different return types from code generator
-                    if isinstance(code_result, dict):
-                        new_code = code_result["code"]
-                        # If we already have latency information from self-healing, use it later
-                        latency_ms_from_healing = code_result.get("latency_ms")
-                    else:
-                        new_code = code_result
-                        latency_ms_from_healing = None
-                    
-                    # Create candidate
-                    problem_name = os.path.basename(os.path.normpath(self.problem_path))
-                    candidate = KernelCandidate(
-                        problem=problem_name,
-                        round=round_num,
-                        code=new_code,
-                        idea=idea
-                    )
-                    
-                    try:
-                        if latency_ms_from_healing is not None:
-                            rprint(f"Using pre-validated candidate from self-healing")
-                            is_correct = True  # We know it's correct from self-healing
-                            latency_ms = latency_ms_from_healing
-                        else:
-                            is_correct, latency_ms = self.evaluator.evaluate(candidate)
-                        
-                        candidate.correct = is_correct
-                        candidate.latency_ms = latency_ms
-                    except Exception as e:
-                        print(f"Error during candidate evaluation: {e}")
-                        candidate.correct = False
-                        candidate.latency_ms = None
-                    
-                    # Save candidate to storage
-                    candidate.id = self.storage.save_candidate(candidate)
-                    
-                    # Format latency display safely, handling None values
-                    latency_display = f"{candidate.latency_ms:.2f}ms" if candidate.latency_ms is not None else "N/A"
-                    rprint(f"Results: correct={candidate.correct}, latency={latency_display}")
-                    
-                    round_candidates.append(candidate)
-                    
-                    # Update best candidate
-                    if candidate.correct and (best_candidate is None or candidate.latency_ms < best_candidate.latency_ms):
-                        best_candidate = candidate
-                    
-                    print("-" * 120)
             print("-" * 120)
             
             # Update previous candidates for next round
             prev_candidates = round_candidates
         
         # Return the best candidate
-        if best_candidate is not None:
-            rprint(f"\n[bold green]Best candidate[/bold green]: round={best_candidate.round}, " + 
-                  f"latency={best_candidate.latency_ms:.2f}ms")
-            rprint(f"Idea: {best_candidate.idea}")
+        if self.best_candidate is not None:
+            rprint(f"\n[bold green]Best candidate[/bold green]: round={self.best_candidate.round}, " + 
+                  f"latency={self.best_candidate.latency_ms:.2f}ms")
+            rprint(f"Idea: {self.best_candidate.idea}")
         else:
             rprint("\n[bold red]No valid candidates found.[/bold red]")
             
-        return best_candidate
+        return self.best_candidate
     
-    def _get_baseline_kernel(self) -> str:
-        """Get the baseline kernel code for the problem.
+
+    def optimize_candidate(self, candidate: KernelCandidate, round_num: int) -> List[KernelCandidate]:
+        """Optimize a candidate kernel."""
+        ideas = self.idea_generator.generate_ideas(candidate.code, self.beam_width)
+        
+        round_candidates = []
+        print("-" * 120)
+        for idea in ideas:
+            candidate = self.optimize_idea(candidate, idea, round_num)
+            round_candidates.append(candidate)
+            
+            # Update best candidate
+            if candidate.correct and (self.best_candidate is None or candidate.latency_ms < self.best_candidate.latency_ms):
+                self.best_candidate = candidate
+
+        return round_candidates
+
+
+    def optimize_idea(self, candidate: KernelCandidate, idea: str, round_num: int) -> KernelCandidate:
+        print("-" * 120)
+
+        idea_title = idea.split("\n")[0]
+        rprint(f"[bold blue]{idea_title}[/bold blue]")
+
+        # Generate code from idea - may return code string or dict with metadata
+        code_result = self.code_generator.generate_code(candidate.code, idea, self.problem_spec)
+        
+        # Handle different return types from code generator
+        if isinstance(code_result, dict):
+            new_code = code_result["code"]
+            # If we already have latency information from self-healing, use it later
+            latency_ms_from_healing = code_result.get("latency_ms")
+        else:
+            new_code = code_result
+            latency_ms_from_healing = None
+        
+        # Create candidate
+        problem_name = os.path.basename(os.path.normpath(self.problem_path))
+        candidate = KernelCandidate(
+            problem=problem_name,
+            round=round_num,
+            code=new_code,
+            idea=idea
+        )
+        
+        try:
+            if latency_ms_from_healing is not None:
+                rprint(f"Using pre-validated candidate from self-healing")
+                is_correct = True  # We know it's correct from self-healing
+                latency_ms = latency_ms_from_healing
+            else:
+                is_correct, latency_ms = self.evaluator.evaluate(candidate)
+            
+            candidate.correct = is_correct
+            candidate.latency_ms = latency_ms
+        except Exception as e:
+            print(f"Error during candidate evaluation: {e}")
+            candidate.correct = False
+            candidate.latency_ms = None
+        
+        # Save candidate to storage
+        candidate.id = self.storage.save_candidate(candidate)
+        
+        # Format latency display safely, handling None values
+        latency_display = f"{candidate.latency_ms:.2f}ms" if candidate.latency_ms is not None else "N/A"
+        rprint(f"Results: correct={candidate.correct}, latency={latency_display}")
+        print("-" * 120)
+        return candidate
+        
+        
+
+
+    def _get_reference_kernel(self) -> str:
+        """Get the reference kernel code for the problem.
         
         Returns:
-            The baseline kernel code
+            The reference kernel code
         """
-        baseline_kernel_path = self.problem_path + "/baseline.cpp"
+        reference_kernel_path = self.problem_path + "/ref_impl.py"
         
-        with open(baseline_kernel_path, "r") as f:
+        with open(reference_kernel_path, "r") as f:
             return f.read()
 
 def main():

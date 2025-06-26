@@ -45,6 +45,15 @@ class MockEvaluator(Evaluator):
 class LocalCPUCompiler(Compiler):
     """Evaluates kernel candidates locally on CPU."""
     
+    def process_code(self, code: str) -> str:
+        """Process the code before compilation."""
+        # code += """
+        # PYBIND11_MODULE(candidate, m) {{
+        #     m.def("kernel", &kernel);
+        # }}
+        # """
+        return code
+
     def get_compile_command(self, source_path: str, output_path: str) -> List[str]:
         """Get the compile command for a given kernel code."""
         compiler = "g++"
