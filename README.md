@@ -1,6 +1,7 @@
 # TensorWrap Kernel Optimization System
 
-A minimal agentic search system for auto-generating and evaluating optimized GPU kernels using LLMs. This implementation is designed specifically for macOS with CPU-only execution.
+An agentic search system for auto-generating and evaluating optimized CPU and GPU kernels using LLMs. Inspired by https://scalingintelligence.stanford.edu/pubs/kernelbench/
+This product starts off with a numpy reference implementation of an operation, and incrementally calls LLMs to generate ideas for optimizing in C++ or CUDA, another LLM call to implement the idea, and then running that kernel to get results for the next iteration for kernel optimization. We are able to replicate results of the Stanford paper. Included in the code are matmul and convolution kernels, and this applies to any operation that can be written in numpy. 
 
 ## Setup
 
